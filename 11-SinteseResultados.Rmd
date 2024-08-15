@@ -1,0 +1,148 @@
+---
+title: "Estimativas de Câncer para Minas Gerais e Macrorregiões - 2024"
+author: "Gil Pena"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r CarregaLibraries, echo = FALSE, message = FALSE, warning = FALSE, include=FALSE}
+rm(list=ls(all=TRUE))
+gc(verbose = FALSE)
+
+Drive<-"E:"
+if (!require(dplyr)) install.packages("dplyr");library(dplyr)
+if (!require(tidyr)) install.packages("tidyr");library(tidyr)
+if(!require(ggplot2)) install.packages("ggplot2"); library(ggplot2)
+if(!require(rmarkdown)) install.packages("rmarkdown"); library(rmarkdown)
+if(!require(knitr)) install.packages("knitr"); library(knitr)
+if(!require(kableExtra)) install.packages("kableExtra"); library(kableExtra)
+if(!require(sf)) install.packages("sf"); library (sf)
+
+TaxasBrutasProj<-read.csv2(file = file.path(Drive,  "Estimativas2024MacroCorretas/TaxaBrutaCasosNovosEstimados/TaxaBrutaComRazaoIMCasosNovosArred.csv"), fileEncoding = "Latin1")
+TaxasBrutasProj<-TaxasBrutasProj|>
+  filter(Macro != "Belo Horizonte")|>
+  filter(Macro != "Poços de Caldas")
+```
+# Síntese de Resultados e Comentários
+
+Apresentamos uma breve síntese das estimativas de incidência para cada ano entre 2024 e 2027 em Minas Gerais. É também incluída uma descrição resumida para cada tipo de neoplasia incluída nesta estimativa. 
+
+```{r CancerMamaFeminina, echo = FALSE, message = FALSE, warning = FALSE, include=FALSE}
+TaxasBrutasProj$EscoreTaxas<-rank(-TaxasBrutasProj$TaxaIncidEstim)
+CancerMama<-TaxasBrutasProj|>
+  filter(Neoplasia == "11-Mama feminina (C50)", Sexo == "Sexo Feminino")|>
+  select(Macro, Sexo, TaxaIncidEstim, NumCasosNovos2024arred, EscoreTaxas)
+
+CancerMama$EscoreTaxas[CancerMama$Macro == "Minas Gerais"]<-9999
+CancerMama<-CancerMama|>
+  arrange(EscoreTaxas)
+
+CancerMamaTab<-CancerMama|>
+  select(Macro, NumCasosNovos2024arred, TaxaIncidEstim)|>
+  rename("Região Ampliada de Saúde" = Macro, "Casos Novos" = NumCasosNovos2024arred, "Taxa Bruta" = TaxaIncidEstim)
+Mapa<-read_sf(file.path(Drive, "Georreferenciamento/Formato .dbf; .prj; .qpj; .shp; .shx/MacroNova/MapaMGMacros.shp"))
+TaxasAjustEst<-read.csv2(file.path(Drive, "Estimativas2024MacroCorretas/TaxaAjustadaEstimada/TaxaAjustEstimada.csv"), 
+                           fileEncoding = "Latin1")
+TaxasAjustEst<-TaxasAjustEst|>
+            select(Macro, Sexo, Neoplasia, TaxaIncidEstim)
+MamaFem<-left_join(Mapa, TaxasAjustEst[TaxasAjustEst$Sexo == "Sexo Feminino" & 
+                   TaxasAjustEst$Neoplasia == "11-Mama feminina (C50)",],
+                   by=c("MacroRg" = "Macro"))
+```
+## Câncer de mama feminina
+
+O número estimado de casos novos para câncer de mama feminina em Minas Gerais, no triênio 2024 a 2027 é de `r CancerMama$NumCasosNovos2024arred[CancerMama$Macro == "Minas Gerais"]` casos, com uma taxa de incidência bruta estimada em `r CancerMama$TaxaIncidEstim[CancerMama$Macro == "Minas Gerais"]` casos novos a cada 100.000 mulheres.  
+
+O maior risco é estimado é para a Região Ampliada de Saúde `r CancerMama$Macro[1]`, com taxa esperada de  `r CancerMama$TaxaIncidEstim[1]` por 100.000 mulheres, com `r CancerMama$NumCasosNovos2024arred[1]` casos novos.  
+
+A seguir, vem a Região Ampliada de Saúde `r CancerMama$Macro[2]`, onde a taxa esperada é de `r CancerMama$TaxaIncidEstim[2]` por 100.000 mulheres, com `r CancerMama$NumCasosNovos2024arred[2]` casos novos.  
+
+O terceiro maior risco foi estimado para a Região Ampliada de Saúde `r CancerMama$Macro[3]`, com a taxa esperada de `r CancerMama$TaxaIncidEstim[3]` por 100.000 mulheres, com `r CancerMama$NumCasosNovos2024arred[3]` casos novos.  
+
+O quarto maior risco foi estimado para a Região Ampliada de Saúde `r CancerMama$Macro[4]`, com a taxa esperada de `r CancerMama$TaxaIncidEstim[4]` por 100.000 mulheres, com `r CancerMama$NumCasosNovos2024arred[4]` casos novos.  
+
+O quinto maior risco foi estimado para a Região Ampliada de Saúde `r CancerMama$Macro[5]`, com a taxa esperada de `r CancerMama$TaxaIncidEstim[5]` por 100.000 mulheres, com `r CancerMama$NumCasosNovos2024arred[5]` casos novos.  
+
+A tabela a seguir resume as estimativas para o Câncer de Mama Feminina nas Regiões Ampliadas de Saúde de Minas Gerais:
+
+`r kable(CancerMamaTab, digits = 2, caption = "Numero de casos novos e taxas brutas estimados para o Câncer de mama feminina por Região Ampliada de Saúde, Minas Gerais, 2024-2027", format.args = list(decimal.mark = ","))`
+
+Para a comparação do risco estimado entre as diferentes Regiões Ampliadas de Saúde, foram calculadas estimativas para as taxas ajustadas pela idade, apresentadas no mapa a seguir
+
+```{r MapaCancerMamaFeminina, echo = FALSE, message = FALSE, warning = FALSE, include=TRUE}
+Mapa<-read_sf(file.path(Drive, "Georreferenciamento/Formato .dbf; .prj; .qpj; .shp; .shx/MacroNova/MapaMGMacros.shp"))
+TaxasAjustEst<-read.csv2(file.path(Drive, "Estimativas2024MacroCorretas/TaxaAjustadaEstimada/TaxaAjustEstimada.csv"), 
+                           fileEncoding = "Latin1")
+TaxasAjustEst<-TaxasAjustEst|>
+            select(Macro, Sexo, Neoplasia, TaxaIncidEstim)
+MamaFem<-left_join(Mapa, TaxasAjustEst[TaxasAjustEst$Sexo == "Sexo Feminino" & 
+                   TaxasAjustEst$Neoplasia == "11-Mama feminina (C50)",],
+                   by=c("MacroRg" = "Macro"))
+MamaFem$fc<-cut(MamaFem$TaxaIncidEstim, breaks = quantile(MamaFem$TaxaIncidEstim, probs = seq(0, 1, 0.25)), include.lowest = TRUE, dig.lab = 4)
+graf<-ggplot() + 
+  geom_sf(data = MamaFem, aes(fill = fc))+
+    coord_sf(datum = NA)+
+  theme_classic()+
+  scale_fill_brewer(palette = "Blues", direction =1, name = "Mama Feminina")+
+  theme(panel.grid.major = element_line(colour = "transparent"))
+print(graf)
+```
+```{r CancerProstata, echo = FALSE, message = FALSE, warning = FALSE, include=FALSE}
+CancerProstata<-TaxasBrutasProj|>
+  filter(Neoplasia == "15-Prostata (C61)", Sexo == "Sexo Masculino")|>
+  select(Macro, Sexo, TaxaIncidEstim, NumCasosNovos2024arred, EscoreTaxas)
+
+CancerProstata$EscoreTaxas[CancerProstata$Macro == "Minas Gerais"]<-9999
+CancerProstata<-CancerProstata|>
+  arrange(EscoreTaxas)
+
+CancerProstataTab<-CancerProstata|>
+  select(Macro, NumCasosNovos2024arred, TaxaIncidEstim)|>
+  rename("Região Ampliada de Saúde" = Macro, "Casos Novos" = NumCasosNovos2024arred, "Taxa Bruta" = TaxaIncidEstim)
+Mapa<-read_sf(file.path(Drive, "Georreferenciamento/Formato .dbf; .prj; .qpj; .shp; .shx/MacroNova/MapaMGMacros.shp"))
+TaxasAjustEst<-read.csv2(file.path(Drive, "Estimativas2024MacroCorretas/TaxaAjustadaEstimada/TaxaAjustEstimada.csv"), 
+                           fileEncoding = "Latin1")
+TaxasAjustEst<-TaxasAjustEst|>
+            select(Macro, Sexo, Neoplasia, TaxaIncidEstim)
+Prostata<-left_join(Mapa, TaxasAjustEst[TaxasAjustEst$Sexo == "Sexo Masculino" & 
+                   TaxasAjustEst$Neoplasia == "15-Prostata (C61)",],
+                   by=c("MacroRg" = "Macro"))
+```
+## Câncer de próstata
+
+O número estimado de casos novos para câncer de próstata em Minas Gerais, no triênio 2024 a 2027 é de `r CancerProstata$NumCasosNovos2024arred[CancerProstata$Macro == "Minas Gerais"]` casos, com uma taxa de incidência bruta estimada em `r CancerProstata$TaxaIncidEstim[CancerProstata$Macro == "Minas Gerais"]` casos novos a cada 100.000 homens.  
+
+O maior risco é estimado é para a Região Ampliada de Saúde `r CancerProstata$Macro[1]`, com taxa esperada de  `r CancerProstata$TaxaIncidEstim[1]` por 100.000 homens, com `r CancerProstata$NumCasosNovos2024arred[1]` casos novos.  
+
+A seguir, vem a Região Ampliada de Saúde `r CancerProstata$Macro[2]`, onde a taxa esperada é de `r CancerProstata$TaxaIncidEstim[2]` por 100.000 homens, com `r CancerProstata$NumCasosNovos2024arred[2]` casos novos.  
+
+O terceiro maior risco foi estimado para a Região Ampliada de Saúde `r CancerProstata$Macro[3]`, com a taxa esperada de `r CancerProstata$TaxaIncidEstim[3]` por 100.000 homens, com `r CancerProstata$NumCasosNovos2024arred[3]` casos novos.  
+
+O quarto maior risco foi estimado para a Região Ampliada de Saúde `r CancerProstata$Macro[4]`, com a taxa esperada de `r CancerProstata$TaxaIncidEstim[4]` por 100.000 homens, com `r CancerProstata$NumCasosNovos2024arred[4]` casos novos.  
+
+O quinto maior risco foi estimado para a Região Ampliada de Saúde `r CancerProstata$Macro[5]`, com a taxa esperada de `r CancerProstata$TaxaIncidEstim[5]` por 100.000 homens, com `r CancerProstata$NumCasosNovos2024arred[5]` casos novos.  
+
+A tabela a seguir resume as estimativas para o Câncer de Mama Feminina nas Regiões Ampliadas de Saúde de Minas Gerais:
+
+`r kable(CancerProstataTab, digits = 2, caption = "Numero de casos novos e taxas brutas estimados para o Câncer de próstata por Região Ampliada de Saúde, Minas Gerais, 2024-2027", format.args = list(decimal.mark = ","))`
+
+Para a comparação do risco estimado entre as diferentes Regiões Ampliadas de Saúde, foram calculadas estimativas para as taxas ajustadas, apresentadas no mapa a seguir
+
+```{r MapaCancerProstata, echo = FALSE, message = FALSE, warning = FALSE, include=TRUE}
+Mapa<-read_sf(file.path(Drive, "Georreferenciamento/Formato .dbf; .prj; .qpj; .shp; .shx/MacroNova/MapaMGMacros.shp"))
+TaxasAjustEst<-read.csv2(file.path(Drive, "Estimativas2024MacroCorretas/TaxaAjustadaEstimada/TaxaAjustEstimada.csv"), 
+                           fileEncoding = "Latin1")
+TaxasAjustEst<-TaxasAjustEst|>
+            select(Macro, Sexo, Neoplasia, TaxaIncidEstim)
+Prostata<-left_join(Mapa, TaxasAjustEst[TaxasAjustEst$Sexo == "Sexo Masculino" & 
+                   TaxasAjustEst$Neoplasia == "15-Prostata (C61)",],
+                   by=c("MacroRg" = "Macro"))
+Prostata$fc<-cut(Prostata$TaxaIncidEstim, breaks = quantile(Prostata$TaxaIncidEstim, probs = seq(0, 1, 0.25)), include.lowest = TRUE, dig.lab = 4)
+graf<-ggplot() + 
+  geom_sf(data = Prostata, aes(fill = fc))+
+    coord_sf(datum = NA)+
+  theme_classic()+
+  scale_fill_brewer(palette = "Greens", direction =1, name = "Próstata")+
+  theme(panel.grid.major = element_line(colour = "transparent"))
+print(graf)
+```

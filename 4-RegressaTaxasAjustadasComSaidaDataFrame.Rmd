@@ -1,0 +1,112 @@
+---
+title: "REGRESSÕES PARA ESTIMATIVA - MG E MACRORREGIÕES  TAXAS AJUSTADAS DE MORTALIDADE"
+author: "Gil (adaptado de Fernanda)"
+date: "`r Sys.Date()`"
+output: word_document
+---
+```{r CarregaLibraries, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+rm(list=ls(all=TRUE))
+gc(verbose = FALSE)
+Drive<-"E:"
+if (!require(dplyr)) install.packages("dplyr");library(dplyr)
+if (!require(tidyr)) install.packages("tidyr");library(tidyr)
+if (!require(readxl)) install.packages("readxl");library(readxl)
+if(!require(ggplot2)) install.packages("ggplot2"); library(ggplot2)
+if(!require(lmtest)) install.packages("lmtest"); library(lmtest)
+if(!require(car)) install.packages("car"); library(car)
+if(!require(gmodels)) install.packages("gmodels"); library(gmodels)
+if(!require(rmarkdown)) install.packages("rmarkdown"); library(rmarkdown)
+if(!require(knitr)) install.packages("knitr"); library(knitr)
+```
+
+
+```{r Leitura-da-base, echo = FALSE}
+ObitosNeoplasiaTaxas<-read.csv2("E:/Estimativas2024/2024-02-16/Taxas1979-2022 por Macro, Sexo e Neoplasia.csv", fileEncoding = "Latin1")
+ObitosNeoplasiaTaxas$SEXO[ObitosNeoplasiaTaxas$SEXO == "1"]<-"Sexo Masculino"
+ObitosNeoplasiaTaxas$SEXO[ObitosNeoplasiaTaxas$SEXO == "2"]<-"Sexo Feminino"
+ObitosNeoplasiaTaxas$SEXO[ObitosNeoplasiaTaxas$SEXO == "Ambos"]<-"Ambos os sexos"
+ListaTaxas<-xtabs(TaxaAjust ~ ANO + MacroRegiao + SEXO + NEOPLASIA, ObitosNeoplasiaTaxas)
+```
+```{r prepara-variaveis, echo = FALSE}
+Neoplasias<-levels(as.factor(ObitosNeoplasiaTaxas$NEOPLASIA))
+Sexo<-levels(as.factor(ObitosNeoplasiaTaxas$SEXO))
+MacroRegiao<-levels(as.factor(ObitosNeoplasiaTaxas$MacroRegiao))
+```
+```{r TaxasAjust,fig.width=7, fig.height = 5, df_print = "paged", echo=FALSE,message=FALSE,results="asis"}
+TaxasAjust.df<-data.frame()
+m=1
+cat("  \n#",  "Regressões para taxas ajustadas","  \n")
+for(m in m: length(MacroRegiao)){
+  cat("  \n")
+  cat("  \n##",  MacroRegiao[m], "  \n")
+cat("  \n")
+s=1
+for(s in s: length(Sexo)){
+cat("  \n")  
+cat("  \n###",  Sexo[s],"  \n")
+n=1
+for(n in n: length(Neoplasias)){
+cat("  \n")  
+cat("  \n####",  Neoplasias[n],"  \n")
+ProximosAnos<-data.frame(Ano = (2023:2027))
+Frame<-ListaTaxas[,MacroRegiao = MacroRegiao[m], SEXO = Sexo[s], NEOPLASIAS = Neoplasias[n]]
+Frame<-data.frame(Ano=names(Frame), TaxasAjust=Frame, row.names=NULL)
+if(sum(Frame$TaxasAjust)==0) cat("  \n", "Nenhum dado", "  \n")
+TaxaAjustMedia<-Frame$TaxasAjust[Frame$Ano == "Ultimos5anos"]
+Frame<-Frame[Frame$Ano!= "Ultimos5anos",]
+Ano<-as.integer(Frame$Ano)
+Modelo<-lm(Frame$TaxasAjust ~ Ano)
+cat("  \n A média da taxa ajustada para ", Neoplasias[n], "em ", MacroRegiao[m],  " e ", Sexo[s], "foi de ", mean(Frame$TaxasAjust), "variando de ", min(Frame$TaxasAjust), "a ", max(Frame$TaxasAjust), "  \n")
+cat("  \n")
+DescrTaxas<-as.data.frame(unclass(summary(Frame$TaxasAjust)))
+colnames(DescrTaxas)<-c("Valor")
+print(kable(DescrTaxas, caption = "Estatísticas descritivas das taxas"))
+cat("  \n")
+TaxasPrevistas<-predict.lm(lm(Frame$TaxasAjust ~ Ano), ProximosAnos, interval = "confidence")
+TaxasPrevistas<-data.frame(TaxasPrevistas)
+colnames(TaxasPrevistas)<-c("Valor.previsto", "95%Lim.inf", "95%Lim.sup")
+TaxasPrevistas$Ano<-2023:2027
+TaxasPrevistas<-TaxasPrevistas|>
+        select("Ano", "Valor.previsto", "95%Lim.inf", "95%Lim.sup")
+TaxasPrevistas<-TaxasPrevistas|>
+        select("Ano", "Valor.previsto", "95%Lim.inf", "95%Lim.sup")
+cat("  \n")
+cat("  \n#####", "Resultados da regressão:")
+cat("  \n")
+print(summary(Modelo))
+cat("  \n")
+plot(Frame$Ano, Frame$TaxasAjust, main = "Taxa Ajustada de Mortalidade", sub = paste(MacroRegiao[m], " - ",Neoplasias[n], " - ", Sexo[s]), xlab = "ANO", ylab = "Taxas Ajustadas")
+plot(fitted(Modelo),residuals(Modelo),xlab="Valores Ajustados",ylab="Resíduos")
+abline(h=0)
+plot(Frame$TaxasAjust, residuals(Modelo),xlab="Tx.bruta",ylab="Resíduos")
+abline(h=0)
+qqnorm(Frame$TaxasAjust)
+qqline(Frame$TaxasAjust)
+par(mfrow = c(1,1))
+cat("  \n")
+if(sum(Frame$TaxasAjust)!=0) test<-shapiro.test(Frame$TaxasAjust)
+if(sum(Frame$TaxasAjust)!=0) print(test)
+cat("  \n")
+cat("Valor do r-square:", summary(Modelo)$r.squared)
+cat("  \n")
+cat("coeficientes: ", summary(Modelo)$coefficients[, 'Estimate'])
+print(kable(TaxasPrevistas, caption = "Taxas Previstas para 2023 a 2027"))
+cat("  \n")
+cat("Taxa média dos últimos 5 anos: ", TaxaAjustMedia)
+TaxasAjust.df<-rbind(TaxasAjust.df, data.frame(Macro = MacroRegiao[m],
+                                                 Sexo = Sexo[s],
+                                                 Neoplasia = Neoplasias[n],
+                                                 TaxaAjustPrev2024 =      TaxasPrevistas$Valor.previsto[TaxasPrevistas$Ano == 2024],
+                                                 TaxaAjustMedia = TaxaAjustMedia,
+                                                 rsquare = summary(Modelo)$r.squared,
+                                                 Shapiro.p.value = test$p.value))
+
+
+n=n+1
+}
+s=s+1
+}
+m=m+1
+}
+write.csv2(TaxasAjust.df, file = file.path(Drive, "Estimativas2024MacroCorretas/RegressoesTxAjust/TaxasAjustProjetadas.csv"), row.names = FALSE, fileEncoding = "Latin1")
+```
